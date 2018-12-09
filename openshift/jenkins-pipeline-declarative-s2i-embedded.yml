@@ -36,7 +36,7 @@ objects:
             environment {
               version = "${VERSION}"
               devTag = "${version}-${BUILD_NUMBER}"
-              TOKEN = "/run/secrets/kubernetes.io/serviceaccount/token"
+              TOKEN = readfile("/run/secrets/kubernetes.io/serviceaccount/token").trim()
             }
             options {
               timeout(time: 5, unit: 'MINUTES')
@@ -62,17 +62,21 @@ objects:
                         if(!openshift.selector("bc", "${APP_NAME}").exists()) {
                           // The selector returned from newBuild will select all objects created by the operation
                           def nb = openshift.newBuild("${GIT_SOURCE_URL}", "--name=${APP_NAME}", "--image-stream=${APP_IMAGE}")
-                        } else {
-                          def nb = openshift.selector("bc", "${APP_NAME}")
-                          nb.startBuild()
+                          // Print out information about the objects created by newBuild
+                          echo "newBuild created: ${nb.count()} objects: ${nb.names()}"
                         }
+                        // Define nb again as the nb definition above can be applied only within the if statement.
                         def nb = openshift.selector("bc", "${APP_NAME}")
-
-                        // Print out information about the objects created by newBuild
-                        echo "newBuild created: ${nb.count()} objects: ${nb.names()}"
+                        nb.startBuild()
 
                         // Filter non-BuildConfig objects and create selector which will find builds related to the BuildConfig
                         def buildSelector = nb.narrow("bc").related("builds")
+
+                        // Print a list of the builds which have been created
+                        echo "Build logs for ${buildSelector.names()}:"
+
+                        // Find the bc again, and ask for its logs
+                        def result = nb.narrow("bc").logs()
 
                         // Throw exception after 5 minutes
                         timeout(5) {
@@ -81,12 +85,6 @@ objects:
                           }
                         }
                         echo "Builds have been completed: ${buildSelector.names()}"
-
-                        // Print a list of the builds which have been created
-                        echo "Build logs for ${buildSelector.names()}:"
-
-                        // Find the bc again, and ask for its logs
-                        def result = nb.narrow("bc").logs()
 
                         // Each high-level operation exposes stout/stderr/status of oc actions that composed
                         echo "Result of logs operation:"
