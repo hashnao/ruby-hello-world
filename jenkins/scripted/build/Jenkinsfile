@@ -5,7 +5,7 @@ pipeline {
   environment {
     version = "${VERSION}"
     devTag = "${version}-${BUILD_NUMBER}"
-    TOKEN = "/run/secrets/kubernetes.io/serviceaccount/token"
+    TOKEN = readFile("/run/secrets/kubernetes.io/serviceaccount/token").trim()
   }
   options {
     timeout(time: 5, unit: 'MINUTES')
